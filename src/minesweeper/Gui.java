@@ -5,18 +5,16 @@ import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.BackgroundFill;
-import javafx.scene.layout.CornerRadii;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
+import java.io.InterruptedIOException;
 import java.util.Random;
 
 public class Gui extends Application {
@@ -33,26 +31,23 @@ public class Gui extends Application {
     }
 
     // -------------------------------------------------------------------------
+    private final int M = 15;
+    private final int N = 15;
 
-    private final TextField[][] sweepingArea = new TextField[15][15];
-    private TextField clickedValue = new TextField();
+    private final TextField[][] sweepingArea = new TextField[M][N];
     private final Label[] infoTextArea = new Label[3];
-    private static final int tileSize = 30;
-    private static final int width = 450;
-    private static final int height = 500;
+    private final int tileSize = 30;
+    private final int width = 450;
+    private final int height = 500;
     private Boolean first = true;
-    private int flags = 0;
+    private int bombs = 0;
     private final Font boldFont = Font.font("Verdana",FontWeight.BOLD,16);
-    private String[] combinations = {"Flags: " + flags,"Minesweeper","Time: "};
-    private Label[] lblCombinations = new Label[combinations.length];
+    private final String[] combinations = {"Bombs: " + bombs,"Minesweeper","Time: "};
+    private final Label[] lblCombinations = new Label[combinations.length];
 
-    private static int M = 15;
-    private static int N = 15;
-
-    private static final int xTiles = width / tileSize;
-    private static final int yTiles = height / tileSize;
-    private Random random = new Random();
-    Game game1 = new Game(sweepingArea);
+    private final int xTiles = width / tileSize;
+    private final int yTiles = height / tileSize;
+    private final Random random = new Random();
 
     private void initContent(GridPane pane) {
         pane.setPadding(new Insets(5));
@@ -66,18 +61,19 @@ public class Gui extends Application {
 
         GridPane infoPane = new GridPane();
         pane.add(infoPane,0,1);
-        pane.setPadding(new Insets(10));
+        pane.setPadding(new Insets(0));
+        infoPane.setBackground(new Background(new BackgroundFill(Color.color(74/255.,117/255.,44/255.), CornerRadii.EMPTY,Insets.EMPTY)));
         pane.setHgap(0);
         pane.setVgap(0);
-
         for (int i = 0; i < infoTextArea.length; i++) {
             lblCombinations[i] = new Label(combinations[i]);
             infoPane.add(lblCombinations[i],i,0);
             GridPane.setHalignment(lblCombinations[i],HPos.CENTER);
+            lblCombinations[i].setStyle("-fx-text-fill: #fff");
 
             infoTextArea[i] = new Label();
             infoPane.add(infoTextArea[i],i,0);
-            infoTextArea[i].setPrefSize(width/3,50);
+            infoTextArea[i].setPrefSize(width/3.,50);
 
             if (i == 1){
                 lblCombinations[i].setFont(boldFont);
@@ -88,21 +84,29 @@ public class Gui extends Application {
 
         GridPane SweepPane = new GridPane();
         pane.add(SweepPane, 0, 2);
-        SweepPane.setPadding(new Insets(10));
+        SweepPane.setPadding(new Insets(0));
         SweepPane.setVgap(0);
         SweepPane.setHgap(0);
 
-        for (int i = 0; i < sweepingArea.length; i++) {
-            for (int j = 0; j < sweepingArea[i].length; j++) {
-                sweepingArea[i][j] = new TextField();
-                SweepPane.add(sweepingArea[i][j],i,j);
-                sweepingArea[i][j].setPrefSize(tileSize,tileSize);
-                sweepingArea[i][j].setText("0");
-                sweepingArea[i][j].setEditable(false);
-                sweepingArea[i][j].setAlignment(Pos.CENTER);
-                sweepingArea[i][j].setFocusTraversable(false);
-                sweepingArea[i][j].setAccessibleText("0" + " " + i + " " + j);
-                sweepingArea[i][j].setOnMouseClicked(event -> this.mouseClicked(event));
+        for (int x = 0; x < sweepingArea.length; x++) {
+            for (int y = 0; y < sweepingArea[x].length; y++) {
+                sweepingArea[x][y] = new TextField();
+                SweepPane.add(sweepingArea[x][y],x,y);
+                sweepingArea[x][y].setPrefSize(tileSize,tileSize);
+                sweepingArea[x][y].setText("");
+                sweepingArea[x][y].setEditable(false);
+                sweepingArea[x][y].setAlignment(Pos.CENTER);
+                sweepingArea[x][y].setFocusTraversable(false);
+                sweepingArea[x][y].setAccessibleText("0 " + x + " " + y + " 0");
+                sweepingArea[x][y].setOnMouseClicked(event ->
+                {
+                    if (event.getButton() == MouseButton.PRIMARY) {
+                        leftMouseClicked(event);
+                    } else if (event.getButton() == MouseButton.SECONDARY) {
+                        rightMouseClicked(event);
+                    }
+                });
+                sweepingArea[x][y].setStyle("-fx-text-fill: #fff;");
             }
         }
 
@@ -110,10 +114,8 @@ public class Gui extends Application {
             for (int j = 0; j < sweepingArea[i].length; j++) {
                 if((i + j) % 2 == 0){
                     sweepingArea[i][j].setBackground(new Background(new BackgroundFill(Color.color(170/255.,215/255.,80/255.), CornerRadii.EMPTY,Insets.EMPTY)));
-                    sweepingArea[i][j].setStyle("-fx-text-fill: #AAD750FF;");
                 } else {
                     sweepingArea[i][j].setBackground(new Background(new BackgroundFill(Color.color(162/255.,209/255.,72/255.), CornerRadii.EMPTY,Insets.EMPTY)));
-                    sweepingArea[i][j].setStyle("-fx-text-fill: #A2D148FF;");
                 }
             }
         }
@@ -123,26 +125,30 @@ public class Gui extends Application {
     // -------------------------------------------------------------------------
 
     public void btnInit(){
-        for (int i = 0; i < sweepingArea.length; i++) {
-            for (int j = 0; j < sweepingArea[i].length; j++) {
-                sweepingArea[i][j].setAccessibleText("" + random.nextInt(7) + " " + i + " " + j);
+        for (int x = 0; x < sweepingArea.length; x++) {
+            for (int y = 0; y < sweepingArea[x].length; y++) {
+                int number = 0;
+                if(random.nextInt(10) == 1) {
+                    number = -1;
+                }
+                sweepingArea[x][y].setAccessibleText(number + " " + x + " " + y + " 0");
             }
         }
-        for (int i = 0; i < sweepingArea.length; i++) {
-            for (int j = 0; j < sweepingArea[i].length; j++) {
-                String[] mineField = sweepingArea[i][j].getAccessibleText().split(" ");
-                if (Integer.parseInt(mineField[0]) == 1){
-                    sweepingArea[i][j].setText("");
-                    for (int x = -1; x <= 1; x++){
-                        for (int y = -1; y <= 1; y++) {
-                            if (i + x < 0 || i + x > 14 || j + y < 0 || j + y > 14) continue;
-                            String[] mineArea = sweepingArea[i+x][j+y].getAccessibleText().split(" ");
-                            if (Integer.parseInt(mineArea[0]) != 1){
-                                sweepingArea[i+x][j+y].setText("" + (Integer.parseInt(sweepingArea[i+x][j+y].getText()) + 1));
-                            } else {
-                                //sweepingArea[i+x][j+y].setBackground(new Background(new BackgroundFill(Color.color(255/255.,0/255.,0/255.), CornerRadii.EMPTY,Insets.EMPTY)));
-                                //sweepingArea[i+x][j+y].setText("");
-                                flags++;
+        for (int X = 0; X < sweepingArea.length; X++) {
+            for (int Y = 0; Y < sweepingArea[X].length; Y++) {
+                int number = Integer.parseInt(sweepingArea[X][Y].getAccessibleText().split(" ")[0]);
+
+                if (number == -1){
+                    bombs++;
+                    for (int xOffset = -1; xOffset <= 1; xOffset++){
+                        for (int yOffset = -1; yOffset <= 1; yOffset++) {
+
+                            if (X + xOffset < 0 || X + xOffset > 14 || Y + yOffset < 0 || Y + yOffset > 14) continue;
+
+                            int mineArea = Integer.parseInt(sweepingArea[X + xOffset][Y + yOffset].getAccessibleText().split(" ")[0]);
+
+                            if (mineArea != -1) {
+                                sweepingArea[X + xOffset][Y + yOffset].setAccessibleText((mineArea + 1) + " " + (X + xOffset) + " " + (Y + yOffset) + " 0");
                             }
                         }
                     }
@@ -153,70 +159,91 @@ public class Gui extends Application {
     }
 
     public void updateInfo(){
-        lblCombinations[0].setText("Flags: " + flags);
+        lblCombinations[0].setText("Bombs: " + bombs);
     }
 
-    public void fieldColor(){
-        String[] mineArea = clickedValue.getAccessibleText().split(" ");
-        if (Integer.parseInt(mineArea[0]) != 1){
-            if((Integer.parseInt(mineArea[1]) + Integer.parseInt(mineArea[2])) % 2 == 0){
-                clickedValue.setBackground(new Background(new BackgroundFill(Color.color(229/255.,194/255.,159/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+    public void steppedOnBomb(){
+        System.out.println("You're dead");
+    }
+
+    public void fieldColor(int bomb, int x,int y){
+        if (bomb == -1) {
+            steppedOnBomb();
+            sweepingArea[x][y].setText("B");
+
+            if((x + y) % 2 == 0) {
+                sweepingArea[x][y].setBackground(new Background(new BackgroundFill(Color.color(210/255.,105/255.,30/255.), CornerRadii.EMPTY,Insets.EMPTY)));
             } else {
-                clickedValue.setBackground(new Background(new BackgroundFill(Color.color(215/255.,184/255.,153/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+                sweepingArea[x][y].setBackground(new Background(new BackgroundFill(Color.color(240/255.,100/255.,0/255.), CornerRadii.EMPTY,Insets.EMPTY)));
             }
-        } else if (Integer.parseInt(mineArea[0]) == 1){
-            clickedValue.setText("B");
-            if((Integer.parseInt(mineArea[1]) + Integer.parseInt(mineArea[2])) % 2 == 0){
-                clickedValue.setBackground(new Background(new BackgroundFill(Color.color(210/255.,105/255.,30/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+        } else if (bomb == 0) {
+            if((x + y) % 2 == 0) {
+                sweepingArea[x][y].setBackground(new Background(new BackgroundFill(Color.color(236/255.,212/255.,187/255.), CornerRadii.EMPTY,Insets.EMPTY)));
             } else {
-                clickedValue.setBackground(new Background(new BackgroundFill(Color.color(240/255.,100/255.,0/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+                sweepingArea[x][y].setBackground(new Background(new BackgroundFill(Color.color(239/255.,218/255.,197/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+            }
+        } else {
+            if((x + y) % 2 == 0) {
+                sweepingArea[x][y].setBackground(new Background(new BackgroundFill(Color.color(229/255.,194/255.,159/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+            } else {
+                sweepingArea[x][y].setBackground(new Background(new BackgroundFill(Color.color(215/255.,184/255.,153/255.), CornerRadii.EMPTY,Insets.EMPTY)));
             }
         }
     }
 
-    public void mouseClicked(MouseEvent event){
-        clickedValue = (TextField) event.getSource();
-        clickedValue.setStyle("-fx-text-fill: #fff;");
+    public void leftMouseClicked(MouseEvent event) {
+        TextField clickedValue = (TextField) event.getSource();
         if (first){
             first = false;
             btnInit();
         }
-        fieldColor();
-        TextField x = new TextField("1");
-        TextField y = new TextField("1");
-        TextField newC = new TextField("9");
-
-        floodFill(sweepingArea,x,y,newC);
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                //Her skal der være kode for FloodFill.
-            }
-
+        if (clickedValue.getText() != ""){
+            return;
+        } else {
+            String[] mineArea = clickedValue.getAccessibleText().split(" ");
+            int x    = Integer.parseInt(mineArea[1]);
+            int y    = Integer.parseInt(mineArea[2]);
+            floodFillUtil(x,y);
         }
     }
 
-    static void floodFillUtil(TextField mineArea[][], int x, int y, TextField prevC, TextField newC){
-        if (x < 0 || x >= M || y < 0 || y >= N){
+    public void rightMouseClicked(MouseEvent event){
+        TextField clickedValue = (TextField) event.getSource();
+        if (first){
             return;
         }
-        if (mineArea[x][y] != prevC){
+        if (clickedValue.getText() != ""){
+            return;
+        } else {
+            bombs--;
+            clickedValue.setText("F");
+            clickedValue.setBackground(new Background(new BackgroundFill(Color.color(207/255.,0/255.,15/255.), CornerRadii.EMPTY,Insets.EMPTY)));
+            updateInfo();
+        }
+    }
+
+    void floodFillUtil(int x, int y) {
+        if (x < 0 || x >= M || y < 0 || y >= N) {
             return;
         }
-        mineArea[x][y] = newC;
+        if (sweepingArea[x][y].getAccessibleText().split(" ")[3].equals("1")) {
+            return;
+        }
+        String bomb = sweepingArea[x][y].getAccessibleText().split(" ")[0];
 
-        floodFillUtil(mineArea, x+1, y, prevC, newC);
-        floodFillUtil(mineArea, x-1, y, prevC, newC);
-        floodFillUtil(mineArea, x, y+1, prevC, newC);
-        floodFillUtil(mineArea, x, y-1, prevC, newC);
+        if(!sweepingArea[x][y].getAccessibleText().split(" ")[0].equals("0")) {
+            sweepingArea[x][y].setAccessibleText(bomb + " " + x + " " + y + " 1");
+            sweepingArea[x][y].setText(bomb);
+            fieldColor(Integer.parseInt(bomb),x,y);
+            return;
+        }
+
+        sweepingArea[x][y].setAccessibleText("0 " + x + " " + y + " 1");
+        fieldColor(Integer.parseInt(bomb),x,y);
+
+        floodFillUtil(x + 1, y);
+        floodFillUtil(x - 1, y);
+        floodFillUtil(x, y + 1);
+        floodFillUtil(x, y - 1);
     }
-
-    static void floodFill(TextField mineArea[][], TextField x, TextField y, TextField newC){
-        TextField prevC = mineArea[Integer.parseInt(x.getText())][Integer.parseInt(y.getText())];
-        if (prevC == newC) return;
-
-        floodFillUtil(mineArea, Integer.parseInt(x.getText()), Integer.parseInt(y.getText()), prevC, newC);
-    }
-
-
 }
